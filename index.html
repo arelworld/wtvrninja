@@ -3,13 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>Rage Slice</title>
 
 <style>
 :root{
     --sage:#A8BBA3;
-    --sage-dark:#7D9277;
-    --bg:#EDF4EB;
+    --sage-dark:#72856D;
+    --bg:#EEF4EC;
 }
 
 *{
@@ -20,42 +21,8 @@
 
 body{
     overflow:hidden;
-    background:linear-gradient(180deg,var(--bg),#dce8d8);
+    background:linear-gradient(to bottom,var(--bg),#dfe8dc);
     font-family:Arial,sans-serif;
-}
-
-#topBar{
-    position:fixed;
-    top:10px;
-    left:50%;
-    transform:translateX(-50%);
-    z-index:100;
-    display:flex;
-    gap:10px;
-    align-items:center;
-    background:white;
-    padding:10px 15px;
-    border-radius:20px;
-    box-shadow:0 5px 15px rgba(0,0,0,.1);
-}
-
-button,label{
-    background:var(--sage);
-    color:white;
-    border:none;
-    padding:10px 15px;
-    border-radius:12px;
-    cursor:pointer;
-}
-
-input{
-    display:none;
-}
-
-#score{
-    font-size:20px;
-    color:var(--sage-dark);
-    font-weight:bold;
 }
 
 #game{
@@ -65,28 +32,65 @@ input{
     overflow:hidden;
 }
 
-.flying{
+#ui{
+    position:fixed;
+    top:15px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:1000;
+
+    display:flex;
+    gap:10px;
+    align-items:center;
+
+    background:white;
+    padding:12px;
+    border-radius:16px;
+
+    box-shadow:0 5px 15px rgba(0,0,0,.1);
+}
+
+#score{
+    font-weight:bold;
+    color:var(--sage-dark);
+}
+
+label,
+button{
+    background:var(--sage);
+    color:white;
+    border:none;
+    padding:10px 15px;
+    border-radius:10px;
+    cursor:pointer;
+}
+
+input{
+    display:none;
+}
+
+.target{
     position:absolute;
-    width:120px;
-    height:120px;
     object-fit:cover;
+    border-radius:15px;
     user-select:none;
     pointer-events:none;
-    border-radius:15px;
+    transform-origin:center center;
 }
 
-.sliceTrail{
+.trail{
     position:absolute;
-    width:20px;
-    height:20px;
-    background:white;
+    width:15px;
+    height:15px;
     border-radius:50%;
+    background:white;
+    opacity:.8;
     pointer-events:none;
-    opacity:.7;
-    animation:fade .3s linear forwards;
+
+    animation:trail .25s linear forwards;
 }
 
-@keyframes fade{
+@keyframes trail{
     to{
         opacity:0;
         transform:scale(3);
@@ -95,21 +99,21 @@ input{
 
 .particle{
     position:absolute;
-    width:10px;
-    height:10px;
-    background:var(--sage-dark);
+    width:8px;
+    height:8px;
     border-radius:50%;
+    background:var(--sage-dark);
     pointer-events:none;
 }
 
 #combo{
     position:fixed;
-    top:80px;
+    top:90px;
     width:100%;
     text-align:center;
     font-size:32px;
-    font-weight:bold;
     color:var(--sage-dark);
+    font-weight:bold;
     pointer-events:none;
 }
 </style>
@@ -117,16 +121,25 @@ input{
 
 <body>
 
-<div id="topBar">
-    <label>
-        Upload Pics
-        <input type="file" id="upload" multiple accept="image/*">
-    </label>
-    <button id="startBtn">Start</button>
-    <div id="score">Score: 0</div>
+<div id="ui">
+
+<label>
+Upload Images
+<input type="file" id="upload" multiple accept="image/*">
+</label>
+
+<button id="startBtn">
+Start
+</button>
+
+<div id="score">
+Score: 0
+</div>
+
 </div>
 
 <div id="combo"></div>
+
 <div id="game"></div>
 
 <audio id="sliceSound">
@@ -135,155 +148,250 @@ input{
 
 <script>
 
-const game=document.getElementById("game");
-const upload=document.getElementById("upload");
-const scoreText=document.getElementById("score");
-const comboText=document.getElementById("combo");
-const sound=document.getElementById("sliceSound");
+const game = document.getElementById("game");
+const upload = document.getElementById("upload");
+const scoreText = document.getElementById("score");
+const comboText = document.getElementById("combo");
+const sliceSound = document.getElementById("sliceSound");
 
-let images=[];
-let score=0;
-let combo=0;
+let images = [];
+let score = 0;
+let combo = 0;
+let gameStarted = false;
 
 upload.addEventListener("change",e=>{
-    images=[];
+
+    images = [];
+
     [...e.target.files].forEach(file=>{
-        const reader=new FileReader();
-        reader.onload=()=>{
+
+        const reader = new FileReader();
+
+        reader.onload = () => {
             images.push(reader.result);
         };
+
         reader.readAsDataURL(file);
+
     });
-    alert("Images loaded!");
+
 });
 
-document.getElementById("startBtn").onclick=()=>{
+document.getElementById("startBtn").onclick = ()=>{
+
+    if(gameStarted) return;
+
     if(images.length===0){
-        alert("Upload pictures first!");
+        alert("Upload images first.");
         return;
     }
-    setInterval(spawnImage,700);
+
+    gameStarted = true;
+
+    setInterval(()=>{
+
+        const amount = Math.floor(Math.random()*3)+1;
+
+        for(let i=0;i<amount;i++){
+
+            setTimeout(()=>{
+                spawnImage();
+            },i*150);
+
+        }
+
+    },900);
+
 };
 
 function spawnImage(){
-    const img=document.createElement("img");
-    img.className="flying";
-    img.src=images[Math.floor(Math.random()*images.length)];
-    
-    const size=90+Math.random()*60;
-    img.style.width=size+"px";
-    img.style.height=size+"px";
-    
-    // FIX: Append to DOM first
+
+    const img = document.createElement("img");
+
+    img.className = "target";
+
+    img.src = images[Math.floor(Math.random()*images.length)];
+
+    const size = 90 + Math.random()*60;
+
+    img.style.width = size+"px";
+    img.style.height = size+"px";
+
+    img.x = Math.random()*(window.innerWidth-size);
+
+    img.y = window.innerHeight+100;
+
+    img.vx = (Math.random()-0.5)*8;
+
+    img.vy = -(18 + Math.random()*8);
+
+    img.rotation = 0;
+
+    img.rotationSpeed = (Math.random()-0.5)*15;
+
+    img.style.left = img.x+"px";
+    img.style.top = img.y+"px";
+
     game.appendChild(img);
-    
-    // FIX: Get fresh dimensions after append
-    const maxX = window.innerWidth - size;
-    const startX = Math.random() * maxX;
-    
-    img.x = startX;
-    img.y = window.innerHeight + 100;
-    img.vx = (Math.random() - 0.5) * 6;
-    img.vy = -(12 + Math.random() * 5);
-    
-    img.style.left = img.x + "px";
-    img.style.top = img.y + "px";
-    
+
     animate(img);
+
 }
 
 function animate(img){
+
     function frame(){
-        img.vy+=0.25;
-        img.x+=img.vx;
-        img.y+=img.vy;
-        img.style.left=img.x+"px";
-        img.style.top=img.y+"px";
-        if(img.y>window.innerHeight+200){
+
+        if(!document.body.contains(img)) return;
+
+        img.vy += 0.35;
+
+        img.x += img.vx;
+        img.y += img.vy;
+
+        img.rotation += img.rotationSpeed;
+
+        img.style.left = img.x+"px";
+        img.style.top = img.y+"px";
+        img.style.transform = `rotate(${img.rotation}deg)`;
+
+        if(
+            img.y > window.innerHeight+250 ||
+            img.x < -250 ||
+            img.x > window.innerWidth+250
+        ){
             img.remove();
             return;
         }
+
         requestAnimationFrame(frame);
     }
-    frame();
+
+    requestAnimationFrame(frame);
+
 }
 
-let lastX=0;
-let lastY=0;
+function createTrail(x,y){
 
-function trail(x,y){
-    const t=document.createElement("div");
-    t.className="sliceTrail";
-    t.style.left=x+"px";
-    t.style.top=y+"px";
-    game.appendChild(t);
-    setTimeout(()=>t.remove(),300);
+    const trail = document.createElement("div");
+
+    trail.className = "trail";
+
+    trail.style.left = x+"px";
+    trail.style.top = y+"px";
+
+    game.appendChild(trail);
+
+    setTimeout(()=>{
+        trail.remove();
+    },250);
+
 }
 
 function explode(x,y){
-    for(let i=0;i<20;i++){
-        const p=document.createElement("div");
-        p.className="particle";
-        p.style.left=x+"px";
-        p.style.top=y+"px";
+
+    for(let i=0;i<25;i++){
+
+        const p = document.createElement("div");
+
+        p.className = "particle";
+
+        p.style.left = x+"px";
+        p.style.top = y+"px";
+
         game.appendChild(p);
-        const dx=(Math.random()-0.5)*200;
-        const dy=(Math.random()-0.5)*200;
-        p.animate([
-            {transform:'translate(0,0)',opacity:1},
-            {transform:`translate(${dx}px,${dy}px)`,opacity:0}
-        ],{
+
+        const dx = (Math.random()-0.5)*250;
+        const dy = (Math.random()-0.5)*250;
+
+        p.animate(
+        [
+            {
+                transform:"translate(0,0)",
+                opacity:1
+            },
+            {
+                transform:`translate(${dx}px,${dy}px)`,
+                opacity:0
+            }
+        ],
+        {
             duration:600
         });
-        setTimeout(()=>p.remove(),600);
+
+        setTimeout(()=>{
+            p.remove();
+        },600);
+
     }
+
 }
 
 function slice(x,y){
-    document.querySelectorAll(".flying").forEach(img=>{
-        const rect=img.getBoundingClientRect();
+
+    document.querySelectorAll(".target").forEach(img=>{
+
+        const rect = img.getBoundingClientRect();
+
         if(
-            x>rect.left &&
-            x<rect.right &&
-            y>rect.top &&
-            y<rect.bottom
+            x >= rect.left &&
+            x <= rect.right &&
+            y >= rect.top &&
+            y <= rect.bottom
         ){
+
             score++;
             combo++;
-            scoreText.innerText="Score: "+score;
-            comboText.innerText="COMBO x"+combo;
+
+            scoreText.innerText = "Score: " + score;
+
+            comboText.innerText = "COMBO x" + combo;
+
             setTimeout(()=>{
                 comboText.innerText="";
-            },800);
-            sound.currentTime=0;
-            sound.play();
+            },700);
+
+            try{
+                sliceSound.currentTime = 0;
+                sliceSound.play();
+            }catch(e){}
+
             if(navigator.vibrate){
                 navigator.vibrate(40);
             }
+
             explode(
-                rect.left+rect.width/2,
-                rect.top+rect.height/2
+                rect.left + rect.width/2,
+                rect.top + rect.height/2
             );
+
             img.remove();
+
         }
+
     });
+
 }
 
 document.addEventListener("mousemove",e=>{
-    trail(e.clientX,e.clientY);
+
+    createTrail(e.clientX,e.clientY);
+
     slice(e.clientX,e.clientY);
-    lastX=e.clientX;
-    lastY=e.clientY;
+
 });
 
 document.addEventListener("touchmove",e=>{
-    const t=e.touches[0];
-    trail(t.clientX,t.clientY);
+
+    const t = e.touches[0];
+
+    createTrail(t.clientX,t.clientY);
+
     slice(t.clientX,t.clientY);
-    lastX=t.clientX;
-    lastY=t.clientY;
+
 },{passive:true});
 
 </script>
+
 </body>
 </html>
