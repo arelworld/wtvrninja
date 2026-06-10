@@ -2,413 +2,535 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Photo Fruit Ninja</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Heart Slice: Photo Ninja ❤️💣</title>
 <style>
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-}
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+    }
 
-body{
-    overflow:hidden;
-    background:#d8e2dc;
-    font-family:Arial,sans-serif;
-}
+    body {
+        overflow: hidden;
+        background: linear-gradient(145deg, #2a2b2e 0%, #1f2022 100%);
+        font-family: 'Segoe UI', 'Poppins', 'Quicksand', system-ui, -apple-system, sans-serif;
+        touch-action: none; /* optimize for touch */
+    }
 
-#game{
-    display:block;
-}
+    #game {
+        display: block;
+        cursor: crosshair;
+    }
 
-.ui{
-    position:fixed;
-    top:15px;
-    left:50%;
-    transform:translateX(-50%);
-    z-index:100;
-    display:flex;
-    gap:12px;
-    align-items:center;
-    background:rgba(255,255,255,.9);
-    padding:12px 18px;
-    border-radius:20px;
-    backdrop-filter:blur(10px);
-}
+    .ui {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 200;
+        display: flex;
+        gap: 18px;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.65);
+        backdrop-filter: blur(12px);
+        padding: 10px 24px;
+        border-radius: 60px;
+        border: 1px solid rgba(255, 215, 200, 0.4);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
 
-.upload{
-    background:#7d9d8c;
-    color:white;
-    padding:10px 15px;
-    border-radius:10px;
-    cursor:pointer;
-    font-weight:bold;
-}
+    .upload {
+        background: #ff6b81;
+        color: white;
+        padding: 8px 20px;
+        border-radius: 40px;
+        cursor: pointer;
+        font-weight: bold;
+        letter-spacing: 0.5px;
+        font-size: 1rem;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    .upload:hover {
+        background: #ff4757;
+        transform: scale(1.02);
+    }
+    .upload:active {
+        transform: scale(0.98);
+    }
 
-#score{
-    color:#4d6a5c;
-    font-weight:bold;
-}
+    #score {
+        color: #ffeaa7;
+        font-weight: bold;
+        font-size: 1.5rem;
+        background: #2d3436b3;
+        padding: 5px 18px;
+        border-radius: 40px;
+        letter-spacing: 1px;
+        font-family: monospace;
+    }
+
+    .bomb-alert {
+        position: fixed;
+        bottom: 30%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #e74c3cee;
+        backdrop-filter: blur(12px);
+        padding: 12px 28px;
+        border-radius: 60px;
+        color: white;
+        font-weight: bold;
+        font-size: 1.8rem;
+        z-index: 300;
+        white-space: nowrap;
+        pointer-events: none;
+        font-family: monospace;
+        letter-spacing: 2px;
+        text-shadow: 0 2px 5px black;
+        transition: opacity 0.2s;
+        border: 1px solid #ffaeae;
+    }
+
+    .restart-btn {
+        background: #ffb347;
+        color: #2c1e0f;
+        border: none;
+        padding: 8px 24px;
+        border-radius: 40px;
+        font-weight: bold;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 2px 8px black;
+        font-family: inherit;
+    }
+    .restart-btn:hover {
+        background: #ff9f2e;
+        transform: scale(1.02);
+    }
+
+    @media (max-width: 600px) {
+        .ui { gap: 12px; padding: 6px 16px; top: 12px; }
+        .upload { padding: 5px 14px; font-size: 0.8rem;}
+        #score { font-size: 1.2rem; padding: 3px 14px;}
+        .restart-btn { padding: 5px 16px; font-size: 0.8rem;}
+        .bomb-alert { font-size: 1.2rem; bottom: 25%; white-space: nowrap; padding: 8px 20px;}
+    }
 </style>
 </head>
 <body>
 
 <div class="ui">
     <label class="upload">
-        Upload Photos
+        📸 ADD HEART PHOTOS
         <input id="upload" type="file" accept="image/*" multiple hidden>
     </label>
-
-    <div id="score">Score: 0</div>
+    <div id="score">❤️ SCORE: 0</div>
+    <button id="restartButton" class="restart-btn">💔 RESTART</button>
 </div>
-
+<div id="bombMessage" class="bomb-alert" style="opacity:0; visibility: hidden;">💣 BOOM! GAME OVER 💣</div>
 <canvas id="game"></canvas>
 
 <script>
+    (function(){
+        // ---------- DOM elements ----------
+        const canvas = document.getElementById("game");
+        const ctx = canvas.getContext("2d");
+        const uploadInput = document.getElementById("upload");
+        const scoreDiv = document.getElementById("score");
+        const restartBtn = document.getElementById("restartButton");
+        const bombMsgDiv = document.getElementById("bombMessage");
 
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+        // ---------- game state ----------
+        let uploadedImages = [];     // array of HTMLImageElement
+        let fruits = [];             // fruit items (photo slices)
+        let bombs = [];              // bomb objects
+        let particles = [];
+        let trail = [];
+        let gameActive = true;       // if false: no slicing, no spawn, freeze interaction
+        let score = 0;
+        let animationId = null;
+        let spawnInterval = null;
+        let bombSpawnInterval = null;
 
-function resize(){
-    canvas.width = innerWidth;
-    canvas.height = innerHeight;
-}
-resize();
-addEventListener("resize",resize);
-
-const uploaded = [];
-const fruits = [];
-const particles = [];
-const trail = [];
-
-let score = 0;
-
-document.getElementById("upload").addEventListener("change",(e)=>{
-
-    uploaded.length = 0;
-
-    [...e.target.files].forEach(file=>{
-
-        const reader = new FileReader();
-
-        reader.onload = ev => {
-
-            const img = new Image();
-
-            img.onload = ()=>uploaded.push(img);
-
-            img.src = ev.target.result;
-        };
-
-        reader.readAsDataURL(file);
-    });
-
-});
-
-class Fruit{
-
-    constructor(img){
-
-        this.img = img;
-
-        this.size = 110 + Math.random()*30;
-
-        this.x = Math.random()*(canvas.width-this.size);
-
-        this.y = canvas.height + 150;
-
-        this.vx = (Math.random()-0.5)*5;
-
-        this.vy = -(13 + Math.random()*5);
-
-        this.gravity = 0.18;
-
-        this.rotation = Math.random()*Math.PI;
-
-        this.rotationSpeed = (Math.random()-0.5)*0.08;
-
-        this.type = Math.floor(Math.random()*4);
-    }
-
-    update(){
-
-        this.vy += this.gravity;
-
-        this.x += this.vx;
-        this.y += this.vy;
-
-        this.rotation += this.rotationSpeed;
-    }
-
-    createFruitPath(){
-
-        if(this.type===0){
-
-            ctx.moveTo(0,-55);
-
-            ctx.bezierCurveTo(
-                65,-90,
-                90,25,
-                0,70
-            );
-
-            ctx.bezierCurveTo(
-                -90,25,
-                -65,-90,
-                0,-55
-            );
-
-        }else if(this.type===1){
-
-            ctx.arc(0,0,60,0,Math.PI*2);
-
-        }else if(this.type===2){
-
-            ctx.moveTo(0,-70);
-
-            ctx.bezierCurveTo(
-                60,-40,
-                70,60,
-                0,75
-            );
-
-            ctx.bezierCurveTo(
-                -70,60,
-                -60,-40,
-                0,-70
-            );
-
-        }else{
-
-            ctx.arc(0,0,62,0,Math.PI*2);
+        // ---------- canvas resize ----------
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
         }
-    }
+        window.addEventListener("resize", () => {
+            resizeCanvas();
+        });
+        resizeCanvas();
 
-    draw(){
+        // ---------- helper: update UI score ----------
+        function updateScoreUI() {
+            scoreDiv.innerText = `❤️ SCORE: ${score}`;
+        }
 
-        ctx.save();
+        // ---------- game over handler ----------
+        function gameOver() {
+            if (!gameActive) return; // already dead
+            gameActive = false;
 
-        ctx.translate(
-            this.x + this.size/2,
-            this.y + this.size/2
-        );
+            // stop spawning new items
+            if (spawnInterval) clearInterval(spawnInterval);
+            if (bombSpawnInterval) clearInterval(bombSpawnInterval);
+            spawnInterval = null;
+            bombSpawnInterval = null;
 
-        ctx.rotate(this.rotation);
+            // show explosion message
+            bombMsgDiv.style.visibility = "visible";
+            bombMsgDiv.style.opacity = "1";
+            bombMsgDiv.innerText = "💣 BOOM! GAME OVER 💣";
+            // auto fade out after 2 sec? but better keep visible, restart clears
+            setTimeout(() => {
+                if (!gameActive) {
+                    // still inactive, maybe keep visible but fine.
+                }
+            }, 200);
 
-        ctx.beginPath();
+            // optional: vibrate for bomb blast (if supported)
+            if (navigator.vibrate) navigator.vibrate([200,100,200]);
+        }
 
-        this.createFruitPath();
+        // ---------- restart game (reset everything) ----------
+        function restartGame() {
+            // kill all objects
+            fruits = [];
+            bombs = [];
+            particles = [];
+            trail = [];
+            // reset score
+            score = 0;
+            updateScoreUI();
+            // activate game
+            gameActive = true;
+            // hide bomb message
+            bombMsgDiv.style.opacity = "0";
+            bombMsgDiv.style.visibility = "hidden";
 
-        ctx.closePath();
+            // clear previous intervals if any
+            if (spawnInterval) clearInterval(spawnInterval);
+            if (bombSpawnInterval) clearInterval(bombSpawnInterval);
 
-        ctx.clip();
+            // restart spawners only if at least one image is uploaded, else skip, but we try anyway
+            startSpawnersIfPossible();
+        }
 
-        ctx.drawImage(
-            this.img,
-            -this.size/2,
-            -this.size/2,
-            this.size,
-            this.size
-        );
+        // start spawning fruits and bombs based on active game and available images
+        function startSpawnersIfPossible() {
+            if (spawnInterval) clearInterval(spawnInterval);
+            if (bombSpawnInterval) clearInterval(bombSpawnInterval);
+            if (!gameActive) return;
 
-        ctx.restore();
+            // only spawn if we have images to use for fruit (hearts)
+            if (uploadedImages.length > 0) {
+                spawnInterval = setInterval(() => {
+                    if (gameActive && uploadedImages.length > 0) {
+                        spawnFruit();
+                    }
+                }, 850);
+                bombSpawnInterval = setInterval(() => {
+                    if (gameActive && uploadedImages.length > 0) {
+                        spawnBomb();
+                    }
+                }, 1800); // bomb every 1.8 sec approx
+            } else {
+                // if no images, set intervals that do nothing? but we'll try short polling
+                spawnInterval = setInterval(() => {
+                    if (gameActive && uploadedImages.length > 0) spawnFruit();
+                }, 850);
+                bombSpawnInterval = setInterval(() => {
+                    if (gameActive && uploadedImages.length > 0) spawnBomb();
+                }, 1800);
+            }
+        }
 
-        ctx.save();
-
-        ctx.translate(
-            this.x + this.size/2,
-            this.y + this.size/2
-        );
-
-        ctx.rotate(this.rotation);
-
-        ctx.beginPath();
-
-        this.createFruitPath();
-
-        ctx.strokeStyle="#557c69";
-        ctx.lineWidth=4;
-        ctx.stroke();
-
-        ctx.restore();
-    }
-}
-
-class Particle{
-
-    constructor(x,y){
-
-        this.x=x;
-        this.y=y;
-
-        this.vx=(Math.random()-0.5)*10;
-        this.vy=(Math.random()-0.5)*10;
-
-        this.life=35;
-
-        this.size=Math.random()*7+2;
-    }
-
-    update(){
-
-        this.x+=this.vx;
-        this.y+=this.vy;
-
-        this.life--;
-    }
-
-    draw(){
-
-        ctx.beginPath();
-        ctx.arc(this.x,this.y,this.size,0,Math.PI*2);
-        ctx.fillStyle="#7d9d8c";
-        ctx.fill();
-    }
-}
-
-function spawnFruit(){
-
-    if(uploaded.length===0) return;
-
-    const img =
-        uploaded[
-            Math.floor(Math.random()*uploaded.length)
-        ];
-
-    fruits.push(new Fruit(img));
-}
-
-setInterval(spawnFruit,900);
-
-function slice(x,y){
-
-    for(let i=fruits.length-1;i>=0;i--){
-
-        const f = fruits[i];
-
-        const cx = f.x + f.size/2;
-        const cy = f.y + f.size/2;
-
-        const dx = x - cx;
-        const dy = y - cy;
-
-        const distance = Math.sqrt(dx*dx + dy*dy);
-
-        if(distance < 60){
-
-            if(navigator.vibrate){
-                navigator.vibrate(25);
+        // ---------- FRUIT (heart shaped image) ----------
+        class FruitHeart {
+            constructor(img) {
+                this.img = img;
+                this.size = 100 + Math.random() * 32;   // size between 100-132px
+                this.x = Math.random() * (canvas.width - this.size);
+                this.y = canvas.height + 40 + Math.random() * 30;
+                this.vx = (Math.random() - 0.5) * 5.2;
+                this.vy = -(14 + Math.random() * 6);
+                this.gravity = 0.2;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotSpeed = (Math.random() - 0.5) * 0.1;
             }
 
-            for(let p=0;p<25;p++){
-                particles.push(
-                    new Particle(cx,cy)
-                );
+            update() {
+                this.vy += this.gravity;
+                this.x += this.vx;
+                this.y += this.vy;
+                this.rotation += this.rotSpeed;
             }
 
-            score++;
+            // draw heart-shaped mask and then image clip
+            drawHeartPath(ctx, x, y, w, h) {
+                // we draw heart centered at (0,0) with width w, height h
+                const scaleX = w / 130;
+                const scaleY = h / 120;
+                ctx.save();
+                ctx.scale(scaleX, scaleY);
+                ctx.beginPath();
+                // classic heart bezier: starting at bottom tip? Actually we draw classic heart outline
+                // Heart centered at (0,0) with nice shape
+                ctx.moveTo(0, 30);
+                ctx.bezierCurveTo(-40, -10, -70, -40, -70, -70);
+                ctx.bezierCurveTo(-70, -95, -45, -110, 0, -85);
+                ctx.bezierCurveTo(45, -110, 70, -95, 70, -70);
+                ctx.bezierCurveTo(70, -40, 40, -10, 0, 30);
+                ctx.closePath();
+                ctx.restore();
+                // now the path is transformed? easier: we clip using transformed version
+            }
 
-            document.getElementById("score").innerText =
-            "Score: " + score;
+            draw() {
+                ctx.save();
+                ctx.translate(this.x + this.size/2, this.y + this.size/2);
+                ctx.rotate(this.rotation);
+                // Build heart mask with relative coordinates
+                const w = this.size;
+                const h = this.size * 0.92; // slightly taller heart proportion
+                ctx.beginPath();
+                // draw heart shape centered
+                const mx = 0, my = 0;
+                // heart parametric (scaled)
+                ctx.moveTo(mx, my + h * 0.35);
+                ctx.bezierCurveTo(mx - w*0.45, my - h*0.15, mx - w*0.6, my - h*0.45, mx - w*0.55, my - h*0.7);
+                ctx.bezierCurveTo(mx - w*0.48, my - h*0.85, mx - w*0.25, my - h*0.95, mx, my - h*0.72);
+                ctx.bezierCurveTo(mx + w*0.25, my - h*0.95, mx + w*0.48, my - h*0.85, mx + w*0.55, my - h*0.7);
+                ctx.bezierCurveTo(mx + w*0.6, my - h*0.45, mx + w*0.45, my - h*0.15, mx, my + h*0.35);
+                ctx.closePath();
+                ctx.clip();
+                // draw image inside heart
+                ctx.drawImage(this.img, -this.size/2, -this.size/2, this.size, this.size);
+                ctx.restore();
 
-            fruits.splice(i,1);
+                // add subtle outline (stroke heart)
+                ctx.save();
+                ctx.translate(this.x + this.size/2, this.y + this.size/2);
+                ctx.rotate(this.rotation);
+                ctx.beginPath();
+                ctx.moveTo(0, this.size*0.35);
+                ctx.bezierCurveTo(-this.size*0.45, -this.size*0.15, -this.size*0.6, -this.size*0.45, -this.size*0.55, -this.size*0.7);
+                ctx.bezierCurveTo(-this.size*0.48, -this.size*0.85, -this.size*0.25, -this.size*0.95, 0, -this.size*0.72);
+                ctx.bezierCurveTo(this.size*0.25, -this.size*0.95, this.size*0.48, -this.size*0.85, this.size*0.55, -this.size*0.7);
+                ctx.bezierCurveTo(this.size*0.6, -this.size*0.45, this.size*0.45, -this.size*0.15, 0, this.size*0.35);
+                ctx.strokeStyle = "#ffb7c5";
+                ctx.lineWidth = 3.5;
+                ctx.shadowBlur = 0;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // check if point (x,y) collides with this heart shape (radius approx)
+            containsPoint(px, py) {
+                const cx = this.x + this.size/2;
+                const cy = this.y + this.size/2;
+                const dx = px - cx;
+                const dy = py - cy;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                // approximate radius ~ size/1.7
+                const hitRadius = this.size * 0.62;
+                return dist < hitRadius;
+            }
         }
-    }
-}
 
-function move(x,y){
+        // ---------- BOMB (deadly, ends game on cut) ----------
+        class Bomb {
+            constructor() {
+                this.size = 85 + Math.random() * 25;
+                this.x = Math.random() * (canvas.width - this.size);
+                this.y = canvas.height + 50 + Math.random() * 40;
+                this.vx = (Math.random() - 0.5) * 4.8;
+                this.vy = -(12 + Math.random() * 5);
+                this.gravity = 0.22;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotSpeed = (Math.random() - 0.5) * 0.09;
+                this.pulse = 0;
+            }
 
-    trail.push({x,y});
+            update() {
+                this.vy += this.gravity;
+                this.x += this.vx;
+                this.y += this.vy;
+                this.rotation += this.rotSpeed;
+                this.pulse = (this.pulse + 0.05) % (Math.PI * 2);
+            }
 
-    if(trail.length>20){
-        trail.shift();
-    }
+            draw() {
+                ctx.save();
+                ctx.translate(this.x + this.size/2, this.y + this.size/2);
+                ctx.rotate(this.rotation);
+                // draw black bomb with skull or hazard
+                ctx.shadowBlur = 0;
+                // outer spherical shape
+                ctx.beginPath();
+                ctx.arc(0, 0, this.size/2, 0, Math.PI*2);
+                ctx.fillStyle = "#1a1a2e";
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(0, 0, this.size/2.2, 0, Math.PI*2);
+                ctx.fillStyle = "#2d2a3e";
+                ctx.fill();
+                // fuse
+                ctx.beginPath();
+                ctx.moveTo(this.size*0.3, -this.size*0.45);
+                ctx.lineTo(this.size*0.5, -this.size*0.7);
+                ctx.lineTo(this.size*0.2, -this.size*0.6);
+                ctx.fillStyle = "#8b5a2b";
+                ctx.fill();
+                // red glowing spark
+                ctx.beginPath();
+                ctx.arc(this.size*0.42, -this.size*0.68, this.size*0.09, 0, Math.PI*2);
+                ctx.fillStyle = "#ff6600";
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(this.size*0.4, -this.size*0.7, this.size*0.05, 0, Math.PI*2);
+                ctx.fillStyle = "#ffaa33";
+                ctx.fill();
 
-    slice(x,y);
-}
+                // skull symbol
+                ctx.font = `bold ${Math.floor(this.size * 0.5)}px "Segoe UI"`;
+                ctx.fillStyle = "#f1f2f6";
+                ctx.shadowBlur = 0;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("💀", 0, 4);
+                // danger stripes
+                ctx.beginPath();
+                ctx.ellipse(0, 0, this.size*0.65, this.size*0.65, 0, 0, Math.PI*2);
+                ctx.strokeStyle = "#c0392b";
+                ctx.lineWidth = 3;
+                ctx.setLineDash([8, 8]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
+            }
 
-canvas.addEventListener("mousemove",e=>{
-    move(e.clientX,e.clientY);
-});
-
-canvas.addEventListener("touchmove",e=>{
-
-    e.preventDefault();
-
-    const t=e.touches[0];
-
-    move(t.clientX,t.clientY);
-
-},{passive:false});
-
-function drawTrail(){
-
-    if(trail.length<2) return;
-
-    ctx.beginPath();
-
-    ctx.moveTo(
-        trail[0].x,
-        trail[0].y
-    );
-
-    for(const p of trail){
-
-        ctx.lineTo(
-            p.x,
-            p.y
-        );
-    }
-
-    ctx.strokeStyle="#557c69";
-    ctx.lineWidth=7;
-    ctx.lineCap="round";
-
-    ctx.shadowBlur=20;
-    ctx.shadowColor="#557c69";
-
-    ctx.stroke();
-
-    ctx.shadowBlur=0;
-}
-
-function animate(){
-
-    ctx.clearRect(
-        0,
-        0,
-        canvas.width,
-        canvas.height
-    );
-
-    for(let i=fruits.length-1;i>=0;i--){
-
-        fruits[i].update();
-        fruits[i].draw();
-
-        if(fruits[i].y > canvas.height+250){
-            fruits.splice(i,1);
+            containsPoint(px, py) {
+                const cx = this.x + this.size/2;
+                const cy = this.y + this.size/2;
+                const dx = px - cx;
+                const dy = py - cy;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                return dist < this.size * 0.55;
+            }
         }
-    }
 
-    for(let i=particles.length-1;i>=0;i--){
-
-        particles[i].update();
-        particles[i].draw();
-
-        if(particles[i].life<=0){
-            particles.splice(i,1);
+        // ---------- Particle effect for slice ----------
+        class SliceParticle {
+            constructor(x,y) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 12;
+                this.vy = (Math.random() - 0.5) * 12 - 3;
+                this.life = 32;
+                this.size = Math.random() * 5 + 2;
+                this.color = `hsl(${Math.random() * 40 + 340}, 80%, 65%)`;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.2;
+                this.life--;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+            }
         }
-    }
 
-    drawTrail();
+        // ---------- spawning ----------
+        function spawnFruit() {
+            if (!gameActive) return;
+            if (uploadedImages.length === 0) return;
+            const randomImg = uploadedImages[Math.floor(Math.random() * uploadedImages.length)];
+            if (randomImg) {
+                fruits.push(new FruitHeart(randomImg));
+            }
+        }
 
-    requestAnimationFrame(animate);
-}
+        function spawnBomb() {
+            if (!gameActive) return;
+            bombs.push(new Bomb());
+        }
 
-animate();
+        // ---------- slice handling (cut detection) ----------
+        function handleSlice(x, y) {
+            if (!gameActive) return false;   // game over, no slicing reactions
 
-</script>
-</body>
-</html>
+            // check bombs FIRST: if bomb is cut => GAME OVER immediately
+            for (let i = bombs.length-1; i >= 0; i--) {
+                const bomb = bombs[i];
+                if (bomb.containsPoint(x, y)) {
+                    // BOMB CUT - GAME OVER!
+                    gameOver();
+                    // also create explosion particles for bomb effect
+                    const bx = bomb.x + bomb.size/2;
+                    const by = bomb.y + bomb.size/2;
+                    for (let p = 0; p < 45; p++) {
+                        particles.push(new SliceParticle(bx, by));
+                    }
+                    bombs.splice(i,1);
+                    return true; // bomb triggered, game ends
+                }
+            }
+
+            // if game still active after bomb check => slice fruits
+            let anyHit = false;
+            for (let i=fruits.length-1; i>=0; i--) {
+                const fruit = fruits[i];
+                if (fruit.containsPoint(x, y)) {
+                    anyHit = true;
+                    // vibration
+                    if (navigator.vibrate) navigator.vibrate(20);
+                    const fx = fruit.x + fruit.size/2;
+                    const fy = fruit.y + fruit.size/2;
+                    for (let p = 0; p < 22; p++) {
+                        particles.push(new SliceParticle(fx, fy));
+                    }
+                    score++;
+                    updateScoreUI();
+                    fruits.splice(i,1);
+                }
+            }
+            return anyHit;
+        }
+
+        // record trail and slice on each move
+        let lastMoveTime = 0;
+        function onSliceMove(x, y) {
+            if (!gameActive) return;
+            // add trail for visual
+            trail.push({x, y});
+            if (trail.length > 24) trail.shift();
+            handleSlice(x, y);
+        }
+
+        // ---------- event listeners ----------
+        function handleMouseMove(e) {
+            if (!gameActive) return;
+            onSliceMove(e.clientX, e.clientY);
+        }
+        function handleTouchMove(e) {
+            if (!gameActive) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            if (touch) onSliceMove(touch.clientX, touch.clientY);
+        }
+        canvas.addEventListener("mousemove", handleMouseMove);
+        canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
+        canvas.addEventListener("touchstart", (e) => e.preventDefault());
+
+        // --
