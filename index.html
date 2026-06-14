@@ -60,10 +60,11 @@ body{
     border-radius:10px;
     padding:10px;
     cursor:pointer;
+    background:#f3f4f6;
 }
 
 .saveBtn{
-    background:#007aff;
+    background:#007aff !important;
     color:white;
 }
 
@@ -86,6 +87,7 @@ body{
     width:100%;
     margin-top:10px;
     display:block;
+    border-radius:12px;
 }
 
 .status{
@@ -118,7 +120,11 @@ body{
     <option value="40">40px</option>
 </select>
 
-<input type="color" id="fontColor" value="#111827">
+<input type="color" id="fontColor" value="#111827" title="Text Color">
+
+<input type="color" id="highlightColor" value="#fff59d" title="Highlight Color">
+
+<button onclick="highlightText()">🖍️</button>
 
 <button onclick="toggleDark()">🌓</button>
 
@@ -144,6 +150,11 @@ const statusText = document.getElementById("status");
 
 loadNote();
 
+function saveCurrentNote(){
+    localStorage.setItem("arlNote", note.innerHTML);
+    statusText.textContent = "Saved";
+}
+
 document.getElementById("fontPicker").addEventListener("change", e=>{
     note.style.fontFamily = e.target.value;
 });
@@ -153,18 +164,24 @@ document.getElementById("fontSize").addEventListener("change", e=>{
 });
 
 document.getElementById("fontColor").addEventListener("change", e=>{
-    note.style.color = e.target.value;
+    document.execCommand("foreColor", false, e.target.value);
+    saveCurrentNote();
 });
+
+function highlightText(){
+    const color =
+        document.getElementById("highlightColor").value;
+
+    document.execCommand("hiliteColor", false, color);
+
+    saveCurrentNote();
+}
 
 function toggleDark(){
     document.body.classList.toggle("dark");
 }
 
-note.addEventListener("input", ()=>{
-    localStorage.setItem("arlNote", note.innerHTML);
-
-    statusText.textContent = "Saved";
-});
+note.addEventListener("input", saveCurrentNote);
 
 function loadNote(){
 
@@ -191,7 +208,7 @@ document.getElementById("imgInput").addEventListener("change", function(e){
 
         note.appendChild(img);
 
-        localStorage.setItem("arlNote", note.innerHTML);
+        saveCurrentNote();
     };
 
     reader.readAsDataURL(file);
